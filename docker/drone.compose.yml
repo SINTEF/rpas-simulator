@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: MPL-2.0
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# ONE drone, as a compose project (ARCHITECTURE.md §4.4): our core container plus the
+# on-board partner containers, all on the drone bus drone<ID>.bus. Every drone uses the same file;
+# only DRONE_ID differs. Normally started by scripts/up.sh, scripts/spawn_drone.sh or the UI:
+#   DRONE_ID=3 docker compose -p drone3 -f docker/drone.compose.yml up -d --no-build
+#   DRONE_ID=3 docker compose -p drone3 -f docker/drone.compose.yml --profile '*' down   # all of it
+# The drone_sim network belongs to docker-compose.yml (world, ground_station, web): bring that up first.
+# COMPOSE_PROFILES=partners adds every partner service, COMPOSE_PROFILES=<name> one component. Starting a
+# drone never builds (--no-build): scripts/up.sh builds partner source first, the UI cannot.
+
+networks:
+  drone_sim: { external: true }
+
+x-env: &env
+  DRONE_ID: "${DRONE_ID}"
+  SEN_ETHER_ALLOW_VIRTUAL_INTERFACES: "true"   # compose veth reports NO_CARRIER
+  SEN_ETHER_DISCOVERY_PORT: "60544"            # same value as docker-compose.yml
+
+services:
+  core:                  # ours: airframe, our on-board nodes — one process, as before
+    image: drone_sim/sim      # built by docker-compose.yml's world
+    pull_policy: never
+    container_name: drone${DRONE_ID}
+    hostname: drone${DRONE_ID}     # SEN identifies participants by hostname: unique per drone
+    networks: [drone_sim]
+    labels: { drone_sim.drone: "${DRONE_ID}" }   # scripts/down.sh and /kill find drones by it
+    # scenarios/ is mounted, not baked in; DRONE_SIM_ROOT = the repo's HOST path (the web container
+    # runs this file too, and bind-mount sources are resolved by the Docker daemon on the host).
+    volumes: ["${DRONE_SIM_ROOT:-..}/scenarios:/app/scenarios:ro"]
+    environment:
+      <<: *env
+      START_LATITUDE: "${START_LATITUDE:-999}"          # 999 = unset: parked east of the origin by id
+      START_LONGITUDE: "${START_LONGITUDE:-999}"
+    command: config/drone.yaml
+
+  # --- on-board partner components: one block each (the image + its drone YAML), sharing the
+  # core's network namespace, so they come and go with the core; profiles [partners, <name>].
+  # Delivered as source, a block also gets
+  #   build: { context: ../external/<name>/source, args: { DRONE_SIM: drone_sim/sim } }
+  # Our two examples are in this repo, so they get a build: of their folder (scripts/up.sh builds them).
+  geocage_store:                 # examples/partner_geocage, received as external/geocage (geocage store)
+    profiles: [partners, geocage]
+    image: partner/geocage:0.6.0
+    build: { context: ../examples/partner_geocage, args: { DRONE_SIM: drone_sim/sim } }
+    pull_policy: never
+    network_mode: service:core
+    labels: { drone_sim.drone: "${DRONE_ID}" }
+    environment: *env
+    command: /partner/geocage/drone.yaml
+
+  example_sidecar:               # packages/nodes/drone_nodes/example_node as a partner container
+    profiles: [partners, example_node]
+    image: partner/example_node:0.1.0
+    build: { context: ../packages/nodes/drone_nodes/example_node, args: { DRONE_SIM: drone_sim/sim } }
+    pull_policy: never
+    network_mode: service:core
+    labels: { drone_sim.drone: "${DRONE_ID}" }
+    environment: *env
+    command: /partner/example_node/drone.yaml

@@ -1,0 +1,9 @@
+build/
+build-docker/
+recordings/
+.claude/
+__pycache__/
+dist/
+external/wp4000/
+external/wp5000/
+*:Zone.Identifier

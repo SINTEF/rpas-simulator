@@ -1,0 +1,7 @@
+{
+  "classes": {
+    "drone_sim.DroneLink": {
+      "deferredMethods": ["arm", "disarm", "takeoff", "land", "goToPosition", "setVelocity"]
+    }
+  }
+}

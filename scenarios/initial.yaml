@@ -1,0 +1,11 @@
+# The known initial state: what "Reset simulation" (viz/serve.py /reset) restarts to.
+#   scripts/scenario.py initial           # the same reset from the shell (down.sh, compose up, spawn)
+#   scripts/scenario.py initial --check   # verify the running stack is in it
+# Keep scripts/up.sh's default N equal to the number of drones here.
+drones: {1: null, 2: null}   # id -> start [lat, lon]; null = default ((id-1) x 150 m east of the origin)
+steps: []
+expect:                      # the definition of "initial"
+  timeout: 60
+  world: {paused: false, timeScale: 1.0, simTime: "<60"}
+  drone1: {telemetry.mode: disarmed, telemetry.battery: 1.0}
+  drone2: {telemetry.mode: disarmed, telemetry.battery: 1.0}

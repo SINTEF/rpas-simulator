@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// ISTAR payload as seen by on-board software (drone bus, object "sensor").
+//
+// Published by sim_nodes/imaging_sensor (sim_spec.md section 5). Like the rest of
+// the drone bus it is not frozen: this file is the reference, and changing it means rebuilding and
+// restarting everything (CHANGING.md).
+//
+// A track is one detected ground object, as the payload's EO/IR chain reports it.
+
+struct Track
+{
+  id        : string,      // stable per detected object, e.g. the asset name
+  assetType : string,      // classification, e.g. "tank", "truck"
+  position  : GeoPosition, // estimated position, m AMSL
+  time      : f64          // sim seconds when the track was last updated
+}
+
+sequence<Track> TrackList;
+
+class Sensor
+{
+  var range              : f64 [static]; // slant range within which objects are detected
+  var fieldOfViewDegrees : f64 [static]; // full cone angle of the downward-looking field of view
+
+  var tracks : TrackList [confirmed]; // everything currently in view; empty when nothing is
+}

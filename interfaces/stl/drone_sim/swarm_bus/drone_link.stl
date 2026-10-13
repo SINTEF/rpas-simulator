@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+import "stl/drone_sim/drone_bus/flight_controller.stl"
+package drone_sim;
+
+// The vehicle's public face on the swarm bus (object "drone<ID>"), published by the flight
+// controller's component. It exists because flight_controller stays off the shared bus
+// (ARCHITECTURE.md section 3): other drones, the ground station and any client on swarm.bus read the
+// vehicle here and command it here. Node status and node commands are not here: those nodes publish on swarm.bus
+// themselves (waypoint_navigator_drone<ID>).
+//
+// Telemetry is the same VehicleState snapshot the flight controller publishes: one best-effort
+// struct, one time of validity, the derived fields already computed. The envelope is carried too,
+// so a ground station can plan inside the vehicle's limits: mirrored once from
+// flight_controller.envelope (like FlightController.homePosition), not a static, because this
+// object is built from the YAML before the flight controller is up.
+class DroneLink
+{
+  var droneId  : string [static];
+  var envelope : AirframeEnvelope [confirmed];
+
+  var heartbeat : u64;          // liveness for the ground station: advances while the vehicle is there
+  var telemetry : VehicleState;
+
+  // Forwarded to the flight controller; the ack is the flight controller's (deferred, see
+  // codegen_settings.json), {rejectedUnavailable, "no flight_controller"} while it is not there.
+  fn arm() -> CommandAck;
+  fn disarm() -> CommandAck;
+  // takeoff: altitudeAboveGround in m above the flight controller's homePosition.altitude.
+  fn takeoff(altitudeAboveGround : f64) -> CommandAck;
+  fn land() -> CommandAck;
+  fn goToPosition(target : GeoPosition, speed : f64) -> CommandAck; // speed: m/s
+  fn setVelocity(velocity : Vec3) -> CommandAck;                    // NED m/s
+}

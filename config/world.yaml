@@ -1,0 +1,79 @@
+# World process: sim clock + REST gateway for the UI. Joins sim.bus and swarm.bus.
+include: [ether.yaml]      # the transport (config/ether.yaml)
+load:
+  - name: rest
+    group: 1
+    address: "0.0.0.0"
+    port: @env(REST_PORT,8080)   # native runs of several stacks on one host override this
+    freqHz: 20             # SEN serves HTTP for a whole cycle, then waits a cycle: 20 gives the UI the 10 Hz state publishes
+  - name: recorder         # off by default; RECORD=true to record both buses
+    group: 1
+    recordings:
+      - name: world
+        folder: recordings
+        keyframePeriod: 2 s
+        indexKeyframes: true
+        indexObjects: true
+        autoStart: @env(RECORD,false)
+        selections:
+          - SELECT * FROM sim.bus
+          - SELECT * FROM swarm.bus
+
+build:
+  - name: worldComponent
+    group: 2
+    freqHz: 10
+    imports: [world]
+    objects:
+      - name: world
+        class: world.WorldImpl
+        bus: sim.bus
+        origin:            # the origin = the base (struct static from YAML): Nesodden, across the fjord from Oslo, sea level
+          latitude: 59.8600
+          longitude: 10.6600
+          altitude: 0.0
+        airspace:          # for display (struct static from YAML): a ~14.5 x 14.5 km geocage covering the base and
+                           # central Oslo, where the scenarios fly, with >= 1.5 km margin; no no-fly zones
+          geocage:
+            - {latitude: 59.8150, longitude: 10.5700, altitude: 0.0}
+            - {latitude: 59.8150, longitude: 10.8300, altitude: 0.0}
+            - {latitude: 59.9450, longitude: 10.8300, altitude: 0.0}
+            - {latitude: 59.9450, longitude: 10.5700, altitude: 0.0}
+          noFlyZones: []
+          minAltitude: 0.0
+          maxAltitude: 1500.0
+      # Ground assets: one YAML object each (statics: simBus, assetType, speed, waypoints;
+      # the loop closes last -> first).
+      # Small loops in central Oslo, ~7 km north-east of the base; 0.001 deg lat = 111 m, 0.001 deg lon = 56 m here.
+      - name: tank1
+        class: world.GroundAssetImpl
+        bus: sim.bus
+        simBus: sim.bus
+        assetType: tank
+        speed: 6.0
+        waypoints:
+          - {latitude: 59.9148, longitude: 10.7522, altitude: 0.0}
+          - {latitude: 59.9148, longitude: 10.7558, altitude: 0.0}
+          - {latitude: 59.9139, longitude: 10.7558, altitude: 0.0}
+          - {latitude: 59.9139, longitude: 10.7522, altitude: 0.0}
+      - name: tank2
+        class: world.GroundAssetImpl
+        bus: sim.bus
+        simBus: sim.bus
+        assetType: tank
+        speed: 5.0
+        waypoints:
+          - {latitude: 59.9130, longitude: 10.7500, altitude: 0.0}
+          - {latitude: 59.9118, longitude: 10.7480, altitude: 0.0}
+          - {latitude: 59.9118, longitude: 10.7520, altitude: 0.0}
+      - name: truck1
+        class: world.GroundAssetImpl
+        bus: sim.bus
+        simBus: sim.bus
+        assetType: truck
+        speed: 12.0
+        waypoints:
+          - {latitude: 59.9160, longitude: 10.7480, altitude: 0.0}
+          - {latitude: 59.9160, longitude: 10.7560, altitude: 0.0}
+          - {latitude: 59.9175, longitude: 10.7560, altitude: 0.0}
+          - {latitude: 59.9175, longitude: 10.7480, altitude: 0.0}

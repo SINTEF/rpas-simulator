@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// One snapshot of the vehicle's state. Published as a single struct property, committed in one
+// cycle, so a reader never sees a position from one cycle beside an attitude from the next, and so
+// there is exactly one time of validity for the whole snapshot. Best-effort (no [confirmed]): it is
+// a high-rate latest-value stream, SEN's documented best-effort case (old data never overwrites
+// newer data, mental_model.md "Quality of service").
+//
+// position/velocity/attitude/bodyRates are the primary state; heading, course, groundSpeed and verticalSpeed
+// are derived from them by the publisher (the fields partner telemetry expects, sim_spec.md
+// section 14) so that every consumer computes them the same way, once.
+//
+// heading is where the NOSE points (the yaw of attitude), course is where the vehicle actually
+// TRAVELS (the direction of the horizontal velocity). They need not be equal, so both are published
+// and a consumer never has to guess which one it is being given.
+struct VehicleState
+{
+  position      : GeoPosition,
+  velocity      : Vec3,        // NED m/s
+  attitude      : Quaternion,  // body -> NED
+  bodyRates     : Vec3,        // body roll/pitch/yaw rates p, q, r in rad/s, body axes (x forward, y right, z down), not NED
+  heading       : f64,         // nose heading, deg CW from north = yaw of attitude
+  course        : f64,         // track over ground, deg CW from north, from the horizontal velocity
+  groundSpeed   : f64,         // m/s, horizontal
+  verticalSpeed : f64,         // m/s, positive up
+  mode          : FlightMode,  // armed means mode != disarmed (so crashed counts as armed)
+  battery       : f64,         // 0..1
+  stateTime     : f64          // sim seconds, time of validity of this whole snapshot
+}
+
+// What the airframe can do, in terms every vehicle has. Resolved values, always: whoever publishes
+// this fills in the real numbers, so a reader never has to know a default and there is no
+// "0 means default" sentinel. On-board software plans inside these limits instead of hard-coding them.
+struct AirframeEnvelope
+{
+  minSpeed      : f64, // m/s, minimum commandable airborne speed (0 for a vehicle that can stop)
+  cruiseSpeed   : f64, // m/s, default command speed
+  maxSpeed      : f64, // m/s
+  arrivalRadius : f64  // m; within this horizontal distance a target counts as reached (a vehicle may require a minimum)
+}
+
+// The flight controller as seen by on-board software (drone bus, object "flight_controller").
+// Vehicle-agnostic: these are the semantics every airframe behind it keeps. How a given vehicle
+// realises them (the simulator's fixed wing: packages/airframe/stl/drone_sim/sim/airframe.stl) is
+// not part of this contract.
+// No arbitration: any node on the drone bus may command the vehicle; it flies the most recent
+// command, and no command knows who sent it.
+//   arm          on the ground only; disarmed -> armed. Already armed -> rejectedState.
+//   disarm       on the ground only; refused in flight. Already disarmed -> accepted.
+//   takeoff      armed -> mode takeoff: leave the ground and climb to `altitudeAboveGround` (m, i.e.
+//                above `homePosition.altitude`; 5..10000, else rejectedInvalid), then mode hold at
+//                that altitude.
+//   hold         stay at the point where hold was entered, at that altitude. Not a command: to hold
+//                where you are, call goToPosition(state.position, 0).
+//   goToPosition mode goingTo: fly to the target at `speed` (<= 0 = cruiseSpeed, otherwise clamped
+//                to [minSpeed, maxSpeed]); the target altitude is raised to the vehicle's minimum
+//                height above the ground. Within envelope.arrivalRadius of it the target is reached
+//                and the mode becomes hold there. Airborne only.
+//   setVelocity  mode goingTo: fly a NED velocity setpoint (horizontal speed clamped to
+//                [minSpeed, maxSpeed]) until the next command. A setpoint this vehicle cannot fly
+//                is rejectedInvalid. Airborne only.
+//   land         descend and touch down on the terrain, then mode disarmed. Airborne only.
+//   crashed      not a command: battery 0 in the air (or landing) stops the motors and the vehicle
+//                comes down; touching the terrain in hold or goingTo (e.g. setVelocity sinking) stops
+//                it there. Stays crashed until removed or reset; every command is refused with
+//                rejectedState "crashed". Battery 0 on the ground -> disarmed instead.
+// Rejections: wrong mode -> rejectedState, malformed input -> rejectedInvalid. A command that is
+// valid but cannot be honoured yet (goToPosition / setVelocity / land in mode takeoff while the
+// vehicle is still on the ground) is queued and applied the moment the vehicle is airborne.
+class FlightController
+{
+  var droneId  : string [static];           // a positive integer written as a string ("1", "2", ...), the DRONE_ID every container of the drone gets
+  var envelope : AirframeEnvelope [static]; // what this airframe can do
+
+  // The launch / home position, with `altitude` the GROUND altitude AMSL under it. It is the datum
+  // for every AGL number on this bus (`takeoff(altitudeAboveGround)`), so a node can convert AGL
+  // <-> AMSL with nothing but this object. Published once, as soon as the vehicle knows where it stands; a plain property and not a [static] because
+  // statics are YAML constants and this is only known at runtime. [confirmed] because it is
+  // published exactly once and a reader that misses it has no datum.
+  var homePosition : GeoPosition [confirmed];
+
+  var state : VehicleState; // the whole vehicle state, one snapshot
+
+  fn arm() -> CommandAck;
+  fn disarm() -> CommandAck;
+  fn takeoff(altitudeAboveGround : f64) -> CommandAck;              // m above homePosition.altitude
+  fn land() -> CommandAck;
+  fn goToPosition(target : GeoPosition, speed : f64) -> CommandAck; // speed: m/s, <= 0 = cruise
+  fn setVelocity(velocity : Vec3) -> CommandAck;                    // NED m/s
+}

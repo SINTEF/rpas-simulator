@@ -1,0 +1,26 @@
+diff --git a/components/ether/src/ether_transport.h b/components/ether/src/ether_transport.h
+index f8187eb..21f50c8 100644
+--- a/components/ether/src/ether_transport.h
++++ b/components/ether/src/ether_transport.h
+@@ -186,7 +186,9 @@ inline void EtherTransport::sendTo(kernel::ParticipantAddr& to,
+       {
+         for (auto& [id, procHandler]: readyProcesses_)
+         {
+-          procHandler->sendBusMessageConfirmed(to, busId, std::move(data));
++          // Copy, don't move: moving inside the loop leaves a null payload for
++          // every ready process after the first one (use-after-move SIGSEGV).
++          procHandler->sendBusMessageConfirmed(to, busId, data);
+         }
+       }
+       else
+@@ -236,7 +238,9 @@ inline void EtherTransport::sendTo(kernel::ParticipantAddr& to,
+       {
+         for (auto& [id, procHandler]: readyProcesses_)
+         {
+-          procHandler->sendBusMessageConfirmed(to, busId, std::move(data1), std::move(data2));
++          // Copy, don't move: moving inside the loop leaves a null payload for
++          // every ready process after the first one (use-after-move SIGSEGV).
++          procHandler->sendBusMessageConfirmed(to, busId, data1, data2);
+         }
+       }
+       else

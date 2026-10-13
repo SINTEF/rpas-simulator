@@ -1,0 +1,21 @@
+# Changelog
+
+## v0.20.1 (2026-10-13)
+
+First release. The release version is the bus contract version (`interfaces/VERSION`).
+
+- SEN skeleton for drone swarm components: bus contracts (`.stl`), package layout and one config per process, pinned to SEN commit `05da288e`.
+- Three buses: `drone<ID>.bus` per drone, `swarm.bus` between drones and the ground station, `sim.bus` for ground truth.
+- Each drone is its own Docker Compose project, so code running here runs unchanged on the vehicle.
+- One world process: terrain, ground assets and the simulation clock.
+- Kinematic airframe with flight controller, sensor and battery (an empty battery means a crash).
+- Waypoint navigator: fly a route with `setRoute`.
+- Ground station with a fleet monitor.
+- Browser swarm view (three.js): fleet list, inspector and command dock (arm, takeoff, land, waypoints), spawn and remove drones from the map, reset.
+- One-command Docker stack: `scripts/up.sh`, `scripts/down.sh` and `scripts/spawn_drone.sh` for more drones at runtime.
+- Native build with unit tests, `scripts/run_native.sh` and a SEN development container.
+- Checks: `scripts/smoke.sh`, `scripts/check_health.sh`, and scenarios (`initial`, `battery_crash`) with PASS/FAIL results.
+- Node template `example_node`, which runs in the core process or as a partner container.
+- Partner SDK (`/opt/drone_sim`, `find_package(drone_sim)`) and `scripts/release.sh` for a loadable image.
+- Example partner component delivered as a Docker image: `examples/partner_geocage`.
+- WP4000/WP5000 interfaces built from `external/`.

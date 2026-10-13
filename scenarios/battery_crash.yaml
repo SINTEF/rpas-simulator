@@ -1,0 +1,23 @@
+# Empty battery: drone1 takes off, the world runs at x100 (its maximum: 1800 s of battery ~ 18 s wall),
+# the battery hits 0 in the air -> flight_controller mode crashed: motors off, a glide to the flat ground, speed 0.
+# Every command is then refused ("crashed"); heartbeat and telemetry go on, so fleet_status still lists it alive.
+# One drone is enough to show it.
+# Cleanup puts the time scale back to 1 whatever happened.
+drones: {1: null}
+steps:
+  - [drone1, arm]
+  - [drone1, takeoff, 120.0]
+  - wait_for: {timeout: 90, drone1: {telemetry.position.altitude: ">80"}}
+  - [world, setTimeScale, 100.0]
+  - wait_for: {timeout: 120, drone1: {telemetry.mode: crashed}}
+  - wait_for: {timeout: 120, drone1: {telemetry.position.altitude: "<1"}}   # flat ground at the origin, sea level
+  - refused: [drone1, arm]
+    message: crashed
+  - refused: [drone1, takeoff, 120.0]
+    message: crashed
+expect:
+  timeout: 30
+  drone1: {telemetry.mode: crashed, telemetry.position.altitude: "<1", telemetry.groundSpeed: "<0.1"}
+  fleet_status: {drones.0.alive: true, drones.0.mode: crashed}
+cleanup:
+  - [world, setTimeScale, 1.0]

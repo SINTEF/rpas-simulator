@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/drone_bus/sensor.stl"
+package drone_sim;
+
+// The simulator's payload: the partner-facing Sensor contract plus the knobs only a simulated
+// sensor has (same shape as SimAirframe : extends FlightController). A typed interest on
+// drone_sim.Sensor still finds this object, so on-board consumers never learn that the payload is
+// simulated. It fakes its tracks from the ground-asset truth on sim.bus, which is why the simulated
+// sensor is the one node kind allowed to join sim.bus (ARCHITECTURE.md section 4.3).
+class SimSensor : extends Sensor
+{
+  var droneBus : string [static]; // bus the flight controller is on (own pose)
+  var simBus   : string [static]; // god's-eye bus: the ground-asset truth to fake tracks from
+}

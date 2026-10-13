@@ -1,0 +1,38 @@
+{
+ "name": "oslo",
+ "originLat": 59.9139,
+ "originLon": 10.7522,
+ "format": "int16 little-endian metres, row-major, row 0 = north; bounds are edge-sample centers",
+ "datum": "orthometric (AMSL) heights used directly as ellipsoid heights \u2014 the project's AMSL-as-ellipsoid convention",
+ "demSource": "Copernicus GLO-30 DSM (AWS open data)",
+ "demLicense": "Free to use under the Copernicus DEM licence: (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+ "demAttribution": "Terrain: Copernicus GLO-30 DSM (ESA)",
+ "config": "world.yaml",
+ "theatre": {
+  "file": "dem_theatre.bin",
+  "spacingM": 30.0,
+  "north": 60.0936520661157,
+  "south": 59.734147933884294,
+  "west": 10.21461192285958,
+  "east": 11.28978807714042,
+  "width": 2001,
+  "height": 1335,
+  "extentKm": [
+   60.0,
+   40.0
+  ],
+  "landcover": {
+   "file": "landcover.png",
+   "format": "8-bit greyscale PNG, one pixel per theatre DEM sample (pixel x=j, y=i = sample [i][j]); value = class index",
+   "classes": {
+    "open": 0,
+    "forest": 1,
+    "farmland": 2,
+    "water": 3
+   },
+   "seaRule": "DEM <= 1 m is water",
+   "source": "OpenStreetMap via Overpass API",
+   "license": "ODbL 1.0, (c) OpenStreetMap contributors"
+  }
+ }
+}

@@ -1,0 +1,16 @@
+# On board, as a partner container: the same class as config.yaml, in its own process. Runs in each
+# drone's compose project (docker/drone.compose.yml, service example_sidecar):
+# `sen run /partner/example_node/drone.yaml` with DRONE_ID set. Its object is example_sidecar_drone<ID>:
+# the core process already has example_drone<ID> on swarm.bus, and object names are unique per bus.
+include: [/opt/drone_sim/config/ether.yaml]   # the transport
+build:
+  - name: exampleSidecarComponent
+    group: 4
+    freqHz: 10
+    imports: [example_node]
+    objects:
+      - name: example_sidecar_drone@env(DRONE_ID)
+        class: example_node.ExampleNodeImpl
+        bus: swarm.bus
+        droneId: "@env(DRONE_ID)"
+        droneBus: drone@env(DRONE_ID).bus

@@ -1,0 +1,24 @@
+# LF in the repository and in every checkout: the shell scripts, YAMLs and .stl files run or are
+# read inside Linux containers, also when the clone lives on Windows.
+* text=auto eol=lf
+*.bin binary
+*.png binary
+# Received verbatim, kept byte for byte: the vendored UI files.
+viz/vendor/** -text
+# Internal: tracked in this private repository, left out of the public snapshot (git archive).
+docs/tasks export-ignore
+docs/tasks/** export-ignore
+docs/code-review.md export-ignore
+docs/axis-review.md export-ignore
+docs/bus-review.md export-ignore
+docs/release-review*.md export-ignore
+docs/presentation export-ignore
+docs/presentation/** export-ignore
+docs/ui export-ignore
+docs/ui/** export-ignore
+SEN_BUG_REPORT.md export-ignore
+CLAUDE.md export-ignore
+ROADMAP.md export-ignore
+# Received partner files stay private: the public snapshot has external/ with empty wp4000/ and wp5000/.
+external/geocage export-ignore
+external/geocage/** export-ignore

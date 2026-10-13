@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+enum AssetType : u8 { tank, truck }
+
+// Kinematic ground vehicle following a waypoint loop (sim bus, objects "tank1", "truck1", ...).
+// Each asset is a YAML object entry in config/world.yaml (statics below are the knobs).
+class GroundAsset
+{
+  var simBus    : string [static];          // bus the sim clock object is on
+  var assetType : AssetType [static];
+  var speed     : f64 [static];             // m/s ground speed
+  var waypoints : GeoPositionList [static]; // loop, last -> first
+
+  var position  : GeoPosition;
+  var heading   : f64;         // deg CW from north, 0 up to but not including 360
+  var stateTime : f64;         // sim seconds
+}

@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+// Partner acronyms (docs/GLOSSARY.md): none.
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// Waypoint navigation: flies a Route by calling flight_controller.goToPosition() for one waypoint
+// after the other, and reports progress. Contract; implemented by
+// packages/nodes/drone_nodes/waypoint_navigator (like FlightController by packages/airframe).
+//
+// Lives on swarm.bus, object "waypoint_navigator_drone<ID>" (ARCHITECTURE.md section 3 placement
+// rule): the ground side (the UI, scripts, a base-station component) calls setRoute / cancel there,
+// any client on swarm.bus reads status, and its siblings on board find their own one by droneId.
+// It still flies the flight controller on its drone bus (droneBus).
+//
+// setRoute is accepted in ANY mode: the route is flown as soon as the flight controller is
+// airborne, so "send the route, then take off" works. A waypoint counts as reached within
+// flight_controller.envelope.arrivalRadius, which is also where the flight controller itself switches
+// from goingTo to hold; after the last waypoint it holds there.
+class WaypointNavigator
+{
+  var droneId  : string [static]; // whose navigator this is (the object is on the shared swarm.bus)
+  var droneBus : string [static]; // where the flight controller it flies is
+
+  var route          : Route [confirmed]; // the route being flown (unbounded: must be confirmed)
+  var currentIndex   : u32 [confirmed];   // waypoint currently flown to; changes rarely, must not be lost
+  var distanceToNext : f64;               // m, horizontal, to route.waypoints[currentIndex]
+  var status         : NavigatorStatus [confirmed]; // on-change, must not be lost
+
+  // speed in m/s; 0 = the airframe's cruise speed. Rejects an empty route or non-finite numbers.
+  fn setRoute(route : Route, speed : f64) -> CommandAck;
+  // Stops issuing waypoints (status idle). The flight controller keeps its current target and holds there.
+  fn cancel() -> CommandAck;
+
+  // Fired once when the last waypoint has been reached (the navigator's test counts them); status ==
+  // arrived says the same as state.
+  event arrived(routeId : u32);
+}

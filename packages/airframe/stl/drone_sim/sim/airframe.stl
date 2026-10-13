@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/drone_bus/flight_controller.stl"
+import "stl/drone_sim/sim_bus/truth.stl"
+import "stl/drone_sim/swarm_bus/drone_link.stl"
+package drone_sim;
+
+// The simulator's airframe: the partner-facing FlightController contract plus the knobs only a
+// simulated vehicle has. They live here, in the package that implements them, so that
+// FlightController itself carries no simulator knob. A typed interest on drone_sim.FlightController
+// still finds this object, so on-board nodes never learn that the flight controller
+// they talk to is simulated.
+//
+// FIXED-WING REALISATION of the FlightController semantics (sim_spec.md section 5): a small fixed
+// wing with a minimum airspeed that cannot hover or stop in the air, so "being at a point" is a
+// loiter circle of `loiterRadius` around it.
+//   takeoff      launch run on the current heading until minSpeed, then a climb-out within the
+//                flight-path-angle limit, then hold.
+//   hold         right-hand loiter circle around the hold point at cruiseSpeed.
+//   goToPosition the altitude change is limited by the flight-path angle; arrival switches to the
+//                loiter circle around the target.
+//   setVelocity  read as course + ground speed (at least minSpeed) + climb rate; zero horizontal
+//                speed is rejectedInvalid (it cannot stop).
+//   land         descend on the current course at minSpeed, touch down on the flat terrain, roll
+//                out to a stop, then disarmed.
+//   crashed      wings-level glide at minSpeed down to the flat terrain, then still on the ground.
+// A command during the launch run is queued until the wheels leave the ground.
+// The world is flat (World.origin, sim.bus): homePosition.altitude is the origin altitude, the terrain
+// height everywhere. On-board nodes take their AGL datum from homePosition because they may not join
+// sim.bus (ARCHITECTURE.md section 4.3).
+// Attitude is derived from the motion: roll = bank angle, pitch = flight-path angle, yaw = course.
+// The fixed-wing limits are statics here, not in FlightController.envelope: the contract
+// carries only what any vehicle has. validateEnvelope() refuses to start on an unflyable envelope, never
+// clamps. goToPosition raises the target altitude to at least 10 m above the terrain.
+class SimAirframe : extends FlightController
+{
+  var maxBankDegrees       : f64 [static]; // coordinated-turn bank limit, [1, 79], else refused
+  var maxFlightPathDegrees : f64 [static]; // flight-path-angle limit, climb and descent
+  var loiterRadius         : f64 [static]; // m; hold circle, must fit the bank limit at cruise;
+                                           // envelope.arrivalRadius must be greater (else refused)
+  var simBus             : string [static]; // god's-eye bus: the world (clock, origin) to follow
+  var publishRate        : f64 [static];    // Hz, state publication rate; the model always steps at freqHz
+  var launchAcceleration : f64 [static];    // m/s^2 during the launch run (catapult class: short)
+  // Start position, deg; 999 = unset -> park by drone id east of World.origin. A sentinel because
+  // the origin is only known at runtime, and an @env() default is word characters only (no sign, no point).
+  var startLatitude  : f64 [static]; // START_LATITUDE in the environment (scripts/spawn_drone.sh)
+  var startLongitude : f64 [static]; // START_LONGITUDE
+}
+
+// sim.bus/truth_drone<ID>: a YAML object of the airframe component that mirrors
+// flight_controller.state onto the sim bus. DroneTruth plus the one static a mirror needs: where
+// the flight controller is.
+class SimDroneTruth : extends DroneTruth
+{
+  var droneBus : string [static];
+}
+
+// swarm.bus/drone<ID>: a YAML object of the airframe component, the vehicle's public face:
+// mirrors flight_controller's state and envelope, counts its own heartbeat and forwards the six flight-controller
+// commands. DroneLink plus where the flight controller is. Other processes call only DroneLink's
+// methods, which they know from drone_sim_interfaces, so this class stays in this package.
+class SimDroneLink : extends DroneLink
+{
+  var droneBus : string [static];
+}

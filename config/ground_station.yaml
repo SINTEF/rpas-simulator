@@ -1,0 +1,15 @@
+# Ground station process. Joins only swarm.bus.
+include:
+  - ether.yaml             # the transport (config/ether.yaml)
+  # ground station nodes, one line each: they see the fleet only through what the drones publish on swarm.bus
+  - ../packages/nodes/ground_station_nodes/fleet_monitor/config.yaml
+
+build:
+  - name: groundStationComponent
+    group: 2
+    freqHz: 10
+    imports: [ground_station]
+    objects:
+      - name: ground_station
+        class: ground_station.GroundStationImpl
+        bus: swarm.bus

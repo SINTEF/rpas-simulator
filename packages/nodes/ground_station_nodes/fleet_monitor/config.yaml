@@ -1,0 +1,12 @@
+# How this package is loaded: config/ground_station.yaml includes this file (one `include:` line).
+build:
+  - name: fleetMonitorComponent
+    group: 2
+    freqHz: 2                # liveness needs no more
+    imports: [fleet_monitor]
+    objects:
+      - name: fleet_status
+        class: fleet_monitor.FleetMonitorImpl
+        bus: swarm.bus
+        swarmBus: swarm.bus
+        lostAfter: 3.0       # s; drone<ID> publishes at 10 Hz; three seconds of silence is a lost drone

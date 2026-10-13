@@ -1,0 +1,13 @@
+# How this package is loaded: config/drone.yaml includes this file (one `include:` line).
+build:
+  - name: waypointNavigatorComponent
+    group: 4                 # above airframe (2)
+    freqHz: 10
+    imports: [waypoint_navigator]
+    objects:
+      # On swarm.bus (the ground side calls it: the UI, scripts, a base-station component); flies the flight controller on droneBus.
+      - name: waypoint_navigator_drone@env(DRONE_ID)
+        class: waypoint_navigator.WaypointNavigatorImpl
+        bus: swarm.bus
+        droneId: "@env(DRONE_ID)"
+        droneBus: drone@env(DRONE_ID).bus

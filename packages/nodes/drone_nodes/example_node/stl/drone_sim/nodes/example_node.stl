@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// The template node: swarm.bus/example_drone<ID>. Copy this package, rename, and replace the members
+// below with your own interface; the shared contract types (GeoPosition, CommandAck, ...) come from the
+// import above. It shows three things: read a peer (flight_controller), publish a value, take a call
+// over the air.
+//
+// `package drone_sim;` only because this node ships with the simulator: your own `package <yours>;`
+// (folder stl/<yours>/) works the same, only the class name in a typed interest changes.
+class ExampleNode
+{
+  var droneId  : string [static]; // which drone this object belongs to (one per drone on swarm.bus)
+  var droneBus : string [static]; // the bus the flight controller is on; from YAML, never a C++ literal
+
+  // Published every cycle from flight_controller.state.
+  var position : GeoPosition;
+
+  // The last message received through setMessage(). Unbounded strings must be [confirmed].
+  var message : string [confirmed];
+
+  // Called over swarm.bus by the ground station, another drone or scripts/smoke.sh; the CommandAck
+  // tells the caller whether it was accepted.
+  fn setMessage(message : string) -> CommandAck;
+}

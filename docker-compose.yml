@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: MPL-2.0
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# The fixed services: world, ground_station, web (+ base-station partner services, profile `partners`).
+# Drones are compose projects of their own compose file, docker/drone.compose.yml. Bring everything up with
+#   scripts/up.sh [N]        # builds what is missing (drone_sim/sen-base once), this file, N drone compose projects
+# Then open http://localhost:8000 (the `web` service). scripts/down.sh stops all.
+# Ports are published on 127.0.0.1 only (REST is unauthenticated sim control, web mounts the Docker
+# socket); WEB_PORT / REST_PORT move them on the host.
+# COMPOSE_PROFILES=partners adds every partner service here and in every drone, COMPOSE_PROFILES=<name>
+# one partner component (ARCHITECTURE.md §4.4); their images are loaded (docker load -i …) or, for a
+# component delivered as source, built by scripts/up.sh.
+
+x-env: &env
+  SEN_ETHER_ALLOW_VIRTUAL_INTERFACES: "true"   # compose veth reports NO_CARRIER
+  SEN_ETHER_DISCOVERY_PORT: "60544"            # isolate from other SEN users on the LAN
+
+# drone_sim/sim is built ONCE, by `world`; the other services and the drones reuse the image (four
+# parallel builds of the same image ran WSL2 out of memory). Both args are passed only when set in
+# the environment, so docker/Dockerfile's defaults hold otherwise (SEN_BASE = drone_sim/sen-base:<commit>,
+# JOBS=16; JOBS=<n> sets the compile parallelism).
+x-build: &build
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    args: [SEN_BASE, JOBS]
+  image: drone_sim/sim
+
+networks:
+  default:
+    name: drone_sim          # fixed name: the drones (docker/drone.compose.yml) join it as external
+
+services:
+  world:
+    <<: *build
+    hostname: world
+    environment: *env
+    ports:
+      - "127.0.0.1:${REST_PORT:-8080}:8080"
+      # - "64222:64222"   # TCP discovery hub (fallback mode only)
+    command: config/world.yaml
+
+  ground_station:
+    image: drone_sim/sim     # built by world
+    pull_policy: never  # local image; never pulled (a fresh clone has it only after the build)
+    hostname: ground_station
+    environment: *env
+    depends_on: [world]
+    command: config/ground_station.yaml
+
+  web:
+    build: { context: viz, dockerfile: ../docker/Dockerfile.web }
+    image: drone_sim/web
+    # /spawn, /kill and /reset start and remove drone compose projects with `docker compose` on the host's
+    # Docker Engine: a local dev tool, the socket is root-equivalent. DRONE_SIM_ROOT = host path for the
+    # drones' scenarios/ mount; COMPOSE_PROFILES carries `partners` into the drones it spawns.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/drone.compose.yml:/app/docker/drone.compose.yml:ro
+      - ./scenarios:/app/scenarios:ro     # /reset reads scenarios/initial.yaml
+    environment:
+      <<: *env
+      DRONE_SIM_ROOT: "${DRONE_SIM_ROOT:-$PWD}"   # scripts/up.sh exports it; $PWD covers a bare `docker compose up`
+      COMPOSE_PROFILES: "${COMPOSE_PROFILES:-}"
+      SIM_VERSION: "${SIM_VERSION:-unknown}"   # the top bar's version, scripts/up.sh exports it
+      WEB_PORT: "${WEB_PORT:-8000}"     # serve.py accepts Host localhost:<WEB_PORT> (DNS-rebinding check)
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    depends_on: [world]
+
+
+  # --- base-station partner components: one block each (the image + its base YAML), on swarm.bus,
+  # profiles [partners, <name>]. Delivered as source, a block also gets
+  #   build: { context: external/<name>/source, args: { DRONE_SIM: drone_sim/sim } }
+  # The example is in this repo, so it gets a build: of its folder (scripts/up.sh builds it).
+  geocage:                       # examples/partner_geocage, received as external/geocage (geocage service)
+    profiles: [partners, geocage]
+    image: partner/geocage:0.6.0
+    build: { context: examples/partner_geocage, args: { DRONE_SIM: drone_sim/sim } }
+    pull_policy: never
+    hostname: geocage
+    environment: *env
+    command: /partner/geocage/base.yaml

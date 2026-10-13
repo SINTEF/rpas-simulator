@@ -1,0 +1,20 @@
+build/
+recordings/
+dist/
+.git
+viz/
+.claude/
+scenarios/
+examples/
+# Nothing of external/ is in our image: the closed WP4000/WP5000 files must not ship, and
+# a partner component (image or source) is built into its own image (ARCHITECTURE.md §4.4).
+external/
+# Documentation is not built: a doc edit must not invalidate a COPY layer (a full rebuild).
+docs/
+**/*.md
+# Not read by the image build either (the Dockerfiles COPY named directories; this keeps the
+# context small).
+scripts/
+patches/
+**/__pycache__
+.gitattributes

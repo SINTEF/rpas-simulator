@@ -1,0 +1,58 @@
+# One drone process. Identical for every drone; only DRONE_ID differs.
+# The one drone config (the skeleton); partner components are compose services (ARCHITECTURE.md §4.4).
+# The transport (config/ether.yaml), then one line per node: each node package's config.yaml holds its
+# block (SEN puts an included file's build entry before this file's; `group:` orders the start).
+# Removing a node is deleting its line.
+include:
+  - ether.yaml
+  - ../packages/nodes/drone_nodes/example_node/config.yaml
+  - ../packages/nodes/drone_nodes/waypoint_navigator/config.yaml
+  - ../packages/nodes/sim_nodes/imaging_sensor/config.yaml
+# The drone bus is session drone<ID> (drone@env(DRONE_ID).bus below): every container of this
+# drone's compose project (docker/drone.compose.yml) joins it, and the world's REST reads it directly
+# (`SELECT * FROM drone1.bus`).
+
+build:
+  - name: airframeComponent
+    group: 2
+    freqHz: 50             # flight-model tick; dt = measured wall-clock delta x sim.bus/world timeScale
+    imports: [airframe]
+    objects:
+      - name: flight_controller
+        class: airframe.FlightControllerImpl   # drone_sim.SimAirframe = the FlightController contract + the simulator-only statics
+        bus: drone@env(DRONE_ID).bus
+        simBus: sim.bus
+        droneId: "@env(DRONE_ID)"
+        # The airframe envelope, as one struct static: what any vehicle has. These are resolved
+        # values, not overrides — on-board software reads them from flight_controller.envelope and
+        # plans inside them.
+        envelope:
+          minSpeed: 12.0
+          cruiseSpeed: 18.0
+          maxSpeed: 25.0
+          arrivalRadius: 100.0     # m; > loiterRadius: reached before the hold circle
+        # Simulator-only knobs (not part of the FlightController contract). The model: a small
+        # tactical ISTAR fixed wing of the hand/catapult-launched class.
+        maxBankDegrees: 35.0
+        maxFlightPathDegrees: 10.0
+        loiterRadius: 80.0         # m, hold circle
+        launchAcceleration: 15.0   # m/s^2: min airspeed in under a second, a few metres of run
+        publishRate: 10.0          # Hz, publication rate; the model still steps at freqHz above
+        # Start position, deg: START_LATITUDE / START_LONGITUDE from the environment
+        # (scripts/spawn_drone.sh sets them per container). 999 = unset: a per-id offset east of World.origin. The @env()
+        # default must be \w+, so a sign or a decimal point cannot be the default.
+        startLatitude: @env(START_LATITUDE,999)
+        startLongitude: @env(START_LONGITUDE,999)
+      # The truth the 3D view renders: mirrors flight_controller.state onto the sim bus.
+      - name: truth_drone@env(DRONE_ID)
+        class: airframe.DroneTruthImpl
+        bus: sim.bus
+        droneBus: drone@env(DRONE_ID).bus
+        droneId: "@env(DRONE_ID)"
+      # The vehicle's public face on the swarm bus (telemetry, envelope, its heartbeat, the six
+      # flight-controller commands): flight_controller itself stays off the shared bus.
+      - name: drone@env(DRONE_ID)
+        class: airframe.DroneLinkImpl
+        bus: swarm.bus
+        droneBus: drone@env(DRONE_ID).bus
+        droneId: "@env(DRONE_ID)"

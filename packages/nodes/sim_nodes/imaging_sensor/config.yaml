@@ -1,0 +1,14 @@
+# How this package is loaded: config/drone.yaml includes this file (one `include:` line).
+build:
+  - name: imagingSensorComponent
+    group: 4
+    freqHz: 2                # detection rate; a real payload reports at a few Hz
+    imports: [imaging_sensor]
+    objects:
+      - name: sensor
+        class: imaging_sensor.ImagingSensorImpl
+        bus: drone@env(DRONE_ID).bus
+        droneBus: drone@env(DRONE_ID).bus
+        simBus: sim.bus    # the ONLY node kind that may read the sim bus (ARCHITECTURE.md 4.3)
+        range: 600.0                # m, slant range
+        fieldOfViewDegrees: 90.0    # full cone, looking straight down

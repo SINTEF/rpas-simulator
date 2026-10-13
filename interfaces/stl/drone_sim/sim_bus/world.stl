@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// A no-fly zone of the airspace. Here, not in common/types.stl: World.airspace is its only user.
+struct NoFlyZone
+{
+  zoneName : string,
+  vertices : GeoPositionList // altitude unused
+}
+
+sequence<NoFlyZone> NoFlyZoneList;
+
+// The simulated airspace (config/world.yaml), for display.
+struct Airspace
+{
+  geocage     : GeoPositionList, // empty = no lateral limit; altitude unused
+  noFlyZones  : NoFlyZoneList,
+  minAltitude : f64,             // m AMSL
+  maxAltitude : f64              // m AMSL
+}
+
+// Simulation clock, origin and airspace (sim bus, object "world"). A simulator-only object: the
+// simulator's own components (airframe, simulated sensor) and the view read it; no on-board node does.
+//
+// The simulated world is FLAT: one fixed origin per scenario, flat earth around it, terrain height =
+// origin altitude everywhere (the airframe flies and lands on it, sim_spec.md section 5). This is a
+// property of the simulator, not a contract convention (common/types.stl: WGS84, m AMSL, NED).
+//
+// airspace is for display only (the swarm view draws the scenario's geocage and no-fly zones). It
+// stays: showing the scenario is the simulator's job, and no skeleton contract depends on
+// it (the partner geocage example carries its own limits in its YAML).
+class World
+{
+  var origin       : GeoPosition [static]; // scenario origin; flat-earth reference, terrain height
+  var airspace     : Airspace [static];    // display only; from config/world.yaml
+
+  var simTime   : f64;               // seconds since start, advances at timeScale x wall clock; still while paused
+  var timeScale : f64 [confirmed];   // on-change values: must not be lost
+  var paused    : bool [confirmed];
+
+  fn setTimeScale(scale : f64) -> CommandAck; // [0.05, 100], else rejectedInvalid
+  fn pause() -> CommandAck;
+  fn resume() -> CommandAck;
+}

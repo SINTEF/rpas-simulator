@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+package drone_sim;
+
+// Shared value types for all three buses.
+// Conventions (part of the contract):
+//  - SI units throughout; lat/lon in WGS84 degrees; altitude in metres AMSL.
+//  - Heading and course: degrees clockwise from true north, 0 up to but not including 360.
+//  - Vec3 vectors are NED (north, east, down) in metres / m/s unless the field's comment names another
+//    frame; the one exception is FlightController.bodyRates: body axes (x forward, y right, z down), rad/s.
+//  - Quaternion is (w, x, y, z), rotating body frame (x fwd, y right, z down) into NED.
+//  - Time stamps (VehicleState.stateTime) are sim seconds (World.simTime).
+
+quantity<f64, deg> Latitude  [min: -90.0, max: 90.0];
+quantity<f64, deg> Longitude [min: -180.0, max: 180.0];
+quantity<f64, m>   Altitude;
+
+// Geographic position. Field names match the partner type aucc.Waypoint, so
+// partner nodes convert field by field (sim_spec.md section 14); altitude is metres AMSL.
+struct GeoPosition
+{
+  latitude  : Latitude,
+  longitude : Longitude,
+  altitude  : Altitude
+}
+
+// A list of positions: a route, a waypoint loop, a polygon.
+sequence<GeoPosition> GeoPositionList;
+
+// A route to fly, waypoint by waypoint (waypoint_navigator_drone<ID>.setRoute).
+// A subset of the partner type aucc.Route: the two fields line up with it, its other
+// fields stay out (sim_spec.md section 14).
+struct Route
+{
+  id        : u32,
+  waypoints : GeoPositionList
+}
+
+// Progress of a route (waypoint_navigator_drone<ID>.status).
+enum NavigatorStatus : u8
+{
+  idle,        // no route, or the route was cancelled / refused by the flight controller
+  navigating,  // a route is loaded; flown as soon as the flight controller is airborne
+  arrived      // the last waypoint was reached; the flight controller holds there
+}
+
+// A 3-vector: NED (north, east, down) unless the field's comment names another frame.
+array<f64, 3> Vec3;
+
+// Unit quaternion (w, x, y, z), body -> NED.
+array<f64, 4> Quaternion;
+
+// Flight controller mode. `goto` is a reserved word in STL, hence goingTo.
+// "armed" is not a separate property anywhere: armed means mode != disarmed (crashed is not disarmed,
+// so it counts as armed).
+enum FlightMode : u8
+{
+  disarmed,
+  armed,
+  takeoff,
+  hold,
+  goingTo,
+  land,
+  crashed   // battery empty in the air, or ground contact outside land/takeoff: motors off, refuses every command
+}
+
+// Synchronous validation result of a command.
+enum AckStatus : u8
+{
+  accepted,          // passed validation and will be executed
+  rejectedInvalid,   // malformed input (e.g. NaN, out of range)
+  rejectedState,     // not allowed in the current mode (e.g. takeoff while disarmed)
+  rejectedUnavailable // the target is not there (no such drone / node); command was dropped
+}
+
+// Returned by every command method on every bus.
+struct CommandAck
+{
+  status  : AckStatus,
+  message : string
+}

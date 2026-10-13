@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/drone_bus/flight_controller.stl"
+package drone_sim;
+
+// True airframe state, published by the airframe (sim bus, object "truth_drone<ID>").
+// Same snapshot type as the flight controller publishes: this is what the 3D view renders from
+// (god's eye).
+class DroneTruth
+{
+  var droneId : string [static];
+  var state   : VehicleState;    // best-effort, like FlightController.state
+}

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MPL-2.0
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# drone_sim/web: the swarm view. Static files + the /api proxy to the world process's SEN REST.
+# Build context is viz/ (the root .dockerignore keeps vendor/ and data/ out of the sim image).
+FROM python:3.12.15-slim
+# The Docker CLI + compose plugin (static binaries) for /spawn and /kill: they run
+# `docker compose` on docker/drone.compose.yml, which docker-compose.yml mounts at /app/docker.
+COPY --from=docker:29.8.1-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker:29.8.1-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
+# PyYAML for /reset, which reads scenarios/initial.yaml (mounted at /app/scenarios)
+RUN pip install --no-cache-dir pyyaml
+COPY . /app/viz
+WORKDIR /app
+ENV SEN_WEB_BIND=0.0.0.0 \
+    SEN_REST=world:8080
+EXPOSE 8000
+CMD ["python3", "viz/serve.py"]

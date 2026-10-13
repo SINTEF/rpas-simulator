@@ -1,0 +1,511 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MPL-2.0
+     This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+     If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>drone_sim SEN Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column (~70ch) with wide figures; every bus has its own colour, used identically in text, tables and diagrams. */
+:root {
+  --bg: #f3f4f6; --surface: #ffffff; --fg: #1a2230; --muted: #586274; --line: #d8dce3;
+  --accent: #1d3f7a;
+  --drone: #a45f00; --drone-tint: #fbeed6;
+  --swarm: #2a5cb3; --swarm-tint: #e2eaf8;
+  --sim: #0c7667; --sim-tint: #daf0eb;
+  --partner: #8e3a6e;
+  --warn: #9b2c2c; --warn-tint: #fbe6e3;
+  --display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f131a; --surface: #161b24; --fg: #e2e6ed; --muted: #97a0b0; --line: #2a313d;
+    --accent: #a3bdf0;
+    --drone: #e6a443; --drone-tint: #382a13;
+    --swarm: #7ea5ea; --swarm-tint: #1a2944;
+    --sim: #4cc3ae; --sim-tint: #11322d;
+    --partner: #e08ac0;
+    --warn: #f08b82; --warn-tint: #3a1b1a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f131a; --surface: #161b24; --fg: #e2e6ed; --muted: #97a0b0; --line: #2a313d;
+  --accent: #a3bdf0;
+  --drone: #e6a443; --drone-tint: #382a13;
+  --swarm: #7ea5ea; --swarm-tint: #1a2944;
+  --sim: #4cc3ae; --sim-tint: #11322d;
+  --partner: #e08ac0;
+  --warn: #f08b82; --warn-tint: #3a1b1a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 16px/1.6 var(--body);
+  padding-inline: 16px; padding-block: 0 64px;
+}
+.wrap { max-width: 980px; margin: 0 auto; }
+.col { max-width: 70ch; }
+
+header { padding-block: 48px 28px; border-bottom: 1px solid var(--line); }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.1; margin: 0; }
+h1 { font-size: clamp(34px, 6vw, 52px); font-weight: 700; margin-block: 12px 14px; letter-spacing: -.01em; }
+h2 { font-size: 30px; font-weight: 600; margin-bottom: 14px; }
+h3 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+.lede { font-size: 18px; color: var(--muted); max-width: 64ch; margin: 0; }
+.status { font-size: 14px; color: var(--muted); margin: 16px 0 0; padding-left: 10px; border-left: 3px solid var(--line); max-width: 64ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 20px; font: 13px var(--mono); color: var(--muted); }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; padding-block: 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+nav.toc a { color: var(--accent); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { text-decoration: underline; }
+
+section { padding-block: 44px 8px; }
+p { margin: 0 0 14px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+code { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+ul { padding-left: 20px; margin: 0 0 14px; }
+li { margin-bottom: 6px; }
+
+.bus { font-family: var(--mono); font-size: .86em; font-weight: 500; padding: 1px 7px; border-radius: 999px; white-space: nowrap; border: 1px solid currentColor; }
+.bus.drone { color: var(--drone); background: var(--drone-tint); }
+.bus.swarm { color: var(--swarm); background: var(--swarm-tint); }
+.bus.sim   { color: var(--sim);   background: var(--sim-tint); }
+
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; background: var(--surface); border: 1px solid var(--line); }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font: 600 12px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 22px; }
+.rule { background: var(--surface); border: 1px solid var(--line); padding: 16px 18px; min-width: 0; }
+.rule p:last-child { margin-bottom: 0; }
+
+figure { margin: 18px 0 8px; }
+figure .scroll { background: var(--surface); border: 1px solid var(--line); padding: 12px; }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 70ch; }
+svg { display: block; }
+svg.map { width: 100%; min-width: 760px; height: auto; }
+svg .ctr { fill: var(--bg); stroke: var(--fg); stroke-width: 1.5; }
+svg .ctr-hd { fill: var(--fg); }
+svg .ctr-hd.partner { fill: var(--partner); }
+svg .ctr-t { fill: var(--bg); font-weight: 500; font-size: 12px; }
+svg .sub { fill: var(--muted); font-size: 10.5px; }
+svg .l-plan { stroke-dasharray: 5 4; }
+svg .compose { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 6 4; }
+svg .l-drone { stroke: var(--drone); stroke-width: 2; fill: none; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 20px; margin-top: 14px; font-size: 14px; }
+.lg { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.lg svg { width: 40px; height: 26px; flex: none; margin-top: 1px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--partner); padding: 16px 18px; margin-top: 8px; }
+.note p:last-child { margin-bottom: 0; }
+svg text { font-family: var(--mono); font-size: 11.5px; fill: var(--fg); }
+svg .hdr { font-family: var(--display); font-size: 15px; font-weight: 600; }
+svg .lane-label { font-weight: 500; font-size: 13px; }
+svg .box { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+svg .c-drone { fill: var(--drone-tint); stroke: var(--drone); }
+svg .c-swarm { fill: var(--swarm-tint); stroke: var(--swarm); }
+svg .c-sim   { fill: var(--sim-tint); stroke: var(--sim); }
+svg .c-none  { fill: var(--surface); stroke: var(--muted); }
+svg .l-swarm { stroke: var(--swarm); stroke-width: 2; fill: none; }
+svg .l-sim   { stroke: var(--sim); stroke-width: 2; fill: none; }
+svg .t-drone { fill: var(--drone); } svg .t-swarm { fill: var(--swarm); } svg .t-sim { fill: var(--sim); } svg .t-muted { fill: var(--muted); }
+
+.buses { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; margin-top: 22px; }
+.buscard { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); padding: 14px 18px; min-width: 0; }
+.buscard.drone { --c: var(--drone); } .buscard.swarm { --c: var(--swarm); } .buscard.sim { --c: var(--sim); }
+.buscard h3 { font-family: var(--mono); font-size: 17px; font-weight: 500; color: var(--c); }
+.buscard .who { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.buscard ul { font-size: 15px; margin: 0; }
+
+.startup { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 20px 0 22px; border: 1px solid var(--line); background: var(--surface); }
+.stage { padding: 12px 14px; border-right: 1px solid var(--line); min-width: 0; }
+.stage:last-child { border-right: 0; }
+.stage .g { font: 600 13px var(--mono); color: var(--muted); }
+.stage .n { font-family: var(--display); font-size: 19px; font-weight: 600; }
+.stage .d { font-size: 13px; color: var(--muted); }
+@media (max-width: 520px) {
+  .startup { grid-template-columns: 1fr; }
+  .stage { border-right: 0; border-bottom: 1px solid var(--line); }
+  .stage:last-child { border-bottom: 0; }
+}
+
+ol.hops { list-style: none; padding: 0; margin: 20px 0; counter-reset: hop; display: grid; gap: 0; }
+ol.hops li { counter-increment: hop; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; margin: 0; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+ol.hops li:last-child { border-bottom: 0; }
+ol.hops li::before { content: counter(hop); font: 600 15px/28px var(--mono); text-align: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); }
+ol.hops .where { font-weight: 600; }
+ol.hops .what { font-size: 15px; color: var(--muted); }
+
+pre { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px; overflow-x: auto; font: 13.5px/1.55 var(--mono); margin: 0 0 16px; }
+.k { color: var(--accent); } .cm { color: var(--muted); }
+
+.callout { background: var(--warn-tint); border: 1px solid var(--warn); padding: 16px 18px; margin-top: 8px; }
+.callout .eyebrow { color: var(--warn); margin-bottom: 8px; }
+.callout p:last-child { margin-bottom: 0; }
+
+.next { margin-top: 48px; padding: 20px 22px; background: var(--surface); border: 1px solid var(--line); }
+.next h2 { font-size: 24px; }
+.next ul { margin-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+</head><body>
+
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">drone_sim_v4 · the SEN side</div>
+  <h1>How SEN runs the drone simulator</h1>
+  <p class="lede">The middleware layer in brief: which processes exist, which buses they share, what lives inside one drone, and how a command reaches the flight controller. The visualisation is left out.</p>
+  <p class="status">This page shows the design as of 2026-10-12.</p>
+  <div class="meta"><span>SEN pin 05da288e</span><span>Airbus SEN, C++17</span><span>ARCHITECTURE.md</span></div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#basics">SEN basics</a>
+  <a href="#buses">Processes and buses</a>
+  <a href="#naming">Placement and names</a>
+  <a href="#drone">Inside one drone</a>
+  <a href="#containers">Nodes and images</a>
+  <a href="#contracts">Contracts</a>
+  <a href="#command">A command, end to end</a>
+  <a href="#bug">The interest bug</a>
+  <a href="#build">Build glue</a>
+</nav>
+
+<section id="basics">
+  <div class="col">
+    <h2>SEN in one minute</h2>
+    <p>SEN is a distributed object middleware. Everything is an <strong>object</strong> with <strong>properties</strong> (state), <strong>methods</strong> (commands) and <strong>events</strong> (notifications). Objects live on buses, and SEN moves them between processes for you. Each process starts as <code>sen run &lt;config&gt;.yaml</code>, and the YAML says which packages to import, which components to build and which objects to put on which buses.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Term</th><th>What it is</th><th>Here</th></tr></thead>
+      <tbody>
+        <tr><td><code>.stl</code></td><td>The interface language. Codegen turns each class into a C++ <code>XBase</code>; you write <code>XImpl</code> on top.</td><td><code>interfaces/stl/drone_sim/…</code></td></tr>
+        <tr><td>Object</td><td>A named instance on a bus. Names are unique per bus.</td><td><code>flight_controller</code>, <code>waypoint_navigator_drone1</code></td></tr>
+        <tr><td>Bus</td><td>Written <code>session.bus</code>, always exactly two segments.</td><td><code>swarm.bus</code>, <code>drone1.bus</code></td></tr>
+        <tr><td>Component</td><td>One thread at a fixed rate (<code>freqHz</code>) that owns some objects.</td><td><code>airframeComponent</code> at 50 Hz</td></tr>
+        <tr><td>Kernel</td><td>One per process. Runs the components.</td><td>one per container</td></tr>
+        <tr><td><code>ether</code></td><td>The transport component. Carries non-<code>local</code> buses between processes via multicast discovery.</td><td><code>config/ether.yaml</code>, group 1</td></tr>
+        <tr><td>Interest</td><td>An SQL-like query that finds objects, e.g. <code>selectAllFrom&lt;FlightControllerInterface&gt;(bus)</code>.</td><td>opened in <code>registered()</code> for a drone-bus object; a shared-bus object opens its drone bus in its first <code>update()</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="rules">
+    <div class="rule">
+      <h3>Writes land at commit</h3>
+      <p>Each cycle runs drain → <code>update()</code> → commit. <code>setNextX(v)</code> stages a value that nobody sees until the commit, not even the object itself. <code>getX()</code> reads the frozen current value.</p>
+    </div>
+    <div class="rule">
+      <h3>Everything is async</h3>
+      <p>A method call returns at once. The result arrives in a callback one or two cycles later. With no callback, the result and any error are dropped.</p>
+    </div>
+    <div class="rule">
+      <h3>Handles must stay alive</h3>
+      <p>Subscriptions and connection guards are kept as members. When a handle is destroyed, SEN unsubscribes without a warning.</p>
+    </div>
+  </div>
+</section>
+
+<section id="buses">
+  <div class="col">
+    <h2>Processes and buses</h2>
+    <p>One SEN kernel per process, one process per container. There are three kinds of bus: each drone has its own; objects that other drones or the ground station use share <span class="bus swarm">swarm.bus</span>; and the world's truth sits on <span class="bus sim">sim.bus</span>.</p>
+    <p>The air link is an IP network below SEN: a mesh radio on a real system, the Docker network here. <code>ether</code> carries <span class="bus swarm">swarm.bus</span> across it like any other bus. Link quality is not simulated.</p>
+  </div>
+  <figure>
+    <div class="scroll">
+      <svg class="map" viewBox="0 0 960 488" role="img" aria-label="Diagram: containers grouped into one Docker Compose project per drone, a base station (ground station plus a partner container) and the world, joined by swarm.bus and sim.bus. In drone1's core container, drone1, waypoint_navigator_drone1 and example_drone1 are on swarm.bus; flight_controller and sensor are on drone1.bus; truth_drone1 is on sim.bus. The core container and a partner container share drone1.bus.">
+        <!-- swarm lane -->
+        <rect x="20" y="14" width="920" height="46" rx="6" class="c-swarm" stroke-width="1.5"/>
+        <text x="32" y="42" class="lane-label t-swarm">swarm.bus</text>
+        <text x="928" y="42" text-anchor="end" class="t-muted">ether over the air link (an IP network)</text>
+
+        <!-- drone1 compose project -->
+        <rect x="20" y="80" width="430" height="322" rx="10" class="compose"/>
+        <text x="32" y="98" class="hdr">drone1 · compose project</text>
+        <!-- core container -->
+        <rect x="32" y="108" width="250" height="236" rx="2" class="ctr"/>
+        <rect x="32" y="108" width="250" height="22" rx="2" class="ctr-hd"/>
+        <text x="40" y="123" class="ctr-t">drone1 (core)</text>
+        <text x="40" y="146" class="sub">image drone_sim/sim</text>
+        <!-- on swarm.bus -->
+        <rect x="44" y="156" width="60" height="22" rx="4" class="c-swarm"/><text x="52" y="171">drone1</text>
+        <rect x="44" y="184" width="192" height="22" rx="4" class="c-swarm"/><text x="52" y="199">waypoint_navigator_drone1</text>
+        <rect x="44" y="212" width="124" height="22" rx="4" class="c-swarm"/><text x="52" y="227">example_drone1</text>
+        <path d="M104,167 H262 M236,195 H262 M168,223 H262 V60" class="l-swarm"/>
+        <!-- on drone1.bus -->
+        <rect x="44" y="246" width="138" height="22" rx="4" class="c-drone"/><text x="52" y="261">flight_controller</text>
+        <rect x="190" y="246" width="62" height="22" rx="4" class="c-drone"/><text x="198" y="261">sensor</text>
+                <!-- on sim.bus -->
+        <rect x="44" y="310" width="104" height="22" rx="4" class="c-sim"/><text x="52" y="325">truth_drone1</text>
+        <path d="M96,332 V436" class="l-sim"/>
+        <!-- partner container on board -->
+        <rect x="292" y="108" width="146" height="236" rx="2" class="ctr"/>
+        <rect x="292" y="108" width="146" height="22" rx="2" class="ctr-hd partner"/>
+        <text x="300" y="123" class="ctr-t">geocage_store</text>
+        <text x="300" y="146" class="sub">image partner/geocage</text>
+        <rect x="304" y="188" width="114" height="22" rx="4" class="c-drone"/><text x="312" y="203">geocage_store</text>
+        <text x="304" y="244" class="sub">its own process,</text>
+        <text x="304" y="260" class="sub">same drone bus</text>
+        <path d="M428,108 V60" class="l-swarm"/>
+        <!-- drone1 bus: spans both containers -->
+        <path d="M250,344 V358 M380,344 V358" class="l-drone"/>
+        <rect x="160" y="358" width="278" height="32" rx="5" class="c-drone" stroke-width="1.5"/>
+        <text x="172" y="379" class="lane-label t-drone">drone1.bus</text>
+        <text x="428" y="379" text-anchor="end" class="sub">shared by both containers</text>
+
+        <!-- drone2 compose project, collapsed -->
+        <rect x="462" y="80" width="100" height="322" rx="10" class="compose"/>
+        <text x="470" y="98" class="hdr">drone2</text>
+        <text x="470" y="114" class="hdr">compose</text>
+        <rect x="484" y="126" width="60" height="22" rx="4" class="c-swarm"/><text x="492" y="141">drone2</text>
+        <path d="M540,126 V60" class="l-swarm"/>
+        <text x="512" y="176" text-anchor="middle" class="sub">same images,</text>
+        <text x="512" y="192" text-anchor="middle" class="sub">same YAML,</text>
+        <text x="512" y="208" text-anchor="middle" class="sub">DRONE_ID=2</text>
+        <text x="512" y="232" text-anchor="middle" class="sub">swarm names</text>
+        <text x="512" y="248" text-anchor="middle" class="sub">end _drone2</text>
+        <rect x="467" y="358" width="90" height="32" rx="5" class="c-drone" stroke-width="1.5"/>
+        <text x="512" y="379" text-anchor="middle" class="lane-label t-drone" style="font-size:11.5px">drone2.bus</text>
+        <path d="M512,402 V436" class="l-sim"/>
+
+        <!-- base station: ground station + base-station partner -->
+        <rect x="566" y="80" width="184" height="322" rx="10" class="compose"/>
+        <text x="576" y="98" class="hdr">base station</text>
+        <rect x="574" y="108" width="160" height="96" rx="2" class="ctr"/>
+        <rect x="574" y="108" width="160" height="22" rx="2" class="ctr-hd partner"/>
+        <text x="582" y="123" class="ctr-t">geocage</text>
+        <text x="582" y="146" class="sub">image partner/geocage</text>
+        <rect x="586" y="162" width="66" height="22" rx="4" class="c-swarm"/><text x="594" y="177">geocage</text>
+        <rect x="574" y="218" width="160" height="144" rx="2" class="ctr"/>
+        <rect x="574" y="218" width="160" height="22" rx="2" class="ctr-hd"/>
+        <text x="582" y="233" class="ctr-t">ground_station</text>
+        <text x="582" y="256" class="sub">image drone_sim/sim</text>
+        <rect x="586" y="270" width="122" height="22" rx="4" class="c-swarm"/><text x="594" y="285">ground_station</text>
+        <rect x="586" y="300" width="106" height="22" rx="4" class="c-swarm"/><text x="594" y="315">fleet_status</text>
+        <path d="M652,173 H743 M708,281 H743 M692,311 H743 V60" class="l-swarm"/>
+
+
+        <!-- world -->
+        <rect x="762" y="80" width="178" height="256" rx="2" class="ctr"/>
+        <rect x="762" y="80" width="178" height="22" rx="2" class="ctr-hd"/>
+        <text x="770" y="95" class="ctr-t">world</text>
+        <text x="770" y="118" class="sub">image drone_sim/sim</text>
+        <rect x="774" y="130" width="62" height="22" rx="4" class="c-sim"/><text x="782" y="145">world</text>
+        <rect x="774" y="160" width="120" height="22" rx="4" class="c-sim"/><text x="782" y="175">tank1 · truck1</text>
+        <rect x="774" y="190" width="128" height="22" rx="4" class="c-none"/><text x="782" y="205">rest ⇄ browser</text>
+        <rect x="774" y="220" width="80" height="22" rx="4" class="c-none"/><text x="782" y="235">recorder</text>
+        <path d="M920,80 V60" class="l-swarm"/>
+        <path d="M850,336 V436" class="l-sim"/>
+
+        <!-- sim lane -->
+        <rect x="20" y="436" width="920" height="40" rx="6" class="c-sim" stroke-width="1.5"/>
+        <text x="928" y="461" text-anchor="end" class="lane-label t-sim">sim.bus</text>
+        <text x="130" y="461" class="t-muted">god's-eye truth: sim time, ground assets, true drone poses</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <div class="lg"><svg viewBox="0 0 40 26" aria-hidden="true"><rect x="1" y="1" width="38" height="24" rx="2" class="ctr"/><rect x="1" y="1" width="38" height="8" rx="2" class="ctr-hd"/></svg><span><strong>Our container.</strong> One Docker image running one <code>sen run</code> process, which is one SEN kernel.</span></div>
+      <div class="lg"><svg viewBox="0 0 40 26" aria-hidden="true"><rect x="1" y="1" width="38" height="24" rx="2" class="ctr"/><rect x="1" y="1" width="38" height="8" rx="2" class="ctr-hd partner"/></svg><span><strong>Partner container.</strong> The same, but the image comes from a partner.</span></div>
+      <div class="lg"><svg viewBox="0 0 40 26" aria-hidden="true"><rect x="2" y="6" width="36" height="14" rx="4" class="c-drone"/></svg><span><strong>SEN object.</strong> Made by compiled C++ code that its container's process loads. Colour shows its bus.</span></div>
+      <div class="lg"><svg viewBox="0 0 40 26" aria-hidden="true"><rect x="2" y="2" width="36" height="22" rx="6" class="compose"/></svg><span><strong>Compose project.</strong> One drone's containers (<code>docker/drone.compose.yml</code>, project <code>drone&lt;ID&gt;</code>), started and stopped together.</span></div>
+    </div>
+    <figcaption>In drone1's core, blue objects are on <span class="bus swarm">swarm.bus</span> because another drone or the ground station uses them. Amber objects stay on <span class="bus drone">drone1.bus</span>. Only hardware stand-ins (the airframe's <code>truth_drone&lt;ID&gt;</code> and the simulated sensor) touch <span class="bus sim">sim.bus</span>. The ground station and the base-station partner are grouped as the base station. The ground station joins only <span class="bus swarm">swarm.bus</span>.</figcaption>
+  </figure>
+
+  <div class="buses">
+    <div class="buscard drone">
+      <h3>drone&lt;ID&gt;.bus</h3>
+      <div class="who">one drone: core process + partner containers</div>
+      <ul>
+        <li>Objects only this drone uses, such as <code>flight_controller</code> and <code>sensor</code>.</li>
+        <li>The same names on every drone. C++ never names a bus; it reads its <code>droneBus</code> static.</li>
+        <li>Isolation is by naming. SEN does not enforce it.</li>
+      </ul>
+    </div>
+    <div class="buscard swarm">
+      <h3>swarm.bus</h3>
+      <div class="who">drones, ground station, world/REST, partners</div>
+      <ul>
+        <li>Per drone: <code>drone&lt;ID&gt;</code>, <code>waypoint_navigator_drone&lt;ID&gt;</code>.</li>
+        <li>The ground station: <code>ground_station</code> and <code>fleet_status</code>.</li>
+        <li>The UI commands drones only through this bus, by calling the drone's own objects (<code>drone&lt;ID&gt;</code>, <code>waypoint_navigator_drone&lt;ID&gt;</code>).</li>
+      </ul>
+    </div>
+    <div class="buscard sim">
+      <h3>sim.bus</h3>
+      <div class="who">world process + airframes + simulated sensors</div>
+      <ul>
+        <li><code>world</code> holds sim time, time scale and pause.</li>
+        <li>Ground assets and one <code>truth_drone&lt;ID&gt;</code> per drone.</li>
+        <li>The UI renders from here but never commands through it.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="naming">
+  <div class="col">
+    <h2>Where an object lives, and its name</h2>
+    <p><strong>The rule:</strong> an object goes on <span class="bus swarm">swarm.bus</span> if another drone or the ground station calls or reads it. Everything else stays on <span class="bus drone">drone&lt;ID&gt;.bus</span>. <code>flight_controller</code> and <code>sensor</code> never go on <span class="bus swarm">swarm.bus</span>.</p>
+    <p><strong>Names:</strong> on the drone bus a name is the same on every drone. On <span class="bus swarm">swarm.bus</span> names must be unique, so the YAML appends the drone, and the object gets a <code>droneId</code> static:</p>
+  </div>
+<pre>- name: waypoint_navigator_drone@env(DRONE_ID)   <span class="cm"># → waypoint_navigator_drone1</span>
+  class: waypoint_navigator.WaypointNavigatorImpl
+  bus: swarm.bus
+  droneBus: drone@env(DRONE_ID).bus              <span class="cm"># where it finds flight_controller</span>
+  droneId: "@env(DRONE_ID)"</pre>
+  <div class="col">
+    <p>C++ never builds or parses a name. It asks for all objects of a class and picks one by <code>droneId</code>. Here is how a node on another drone would send drone 2 a route:</p>
+  </div>
+<pre><span class="cm">// registered(): one interest for the class on swarm.bus</span>
+navigatorSub_ = api.selectAllFrom&lt;drone_sim::WaypointNavigatorInterface&gt;(getSwarmBus());
+
+<span class="cm">// later: the WaypointNavigator whose droneId is "2"</span>
+<span class="k">for</span> (<span class="k">auto</span>* navigator : navigatorSub_-&gt;list.getObjects())
+  <span class="k">if</span> (navigator-&gt;getDroneId() == <span class="cm">"2"</span>) navigator-&gt;setRoute(route, speed, callback);</pre>
+  <div class="col">
+    <p>Other drones' telemetry works the same way: the <code>DroneLink</code> objects on <span class="bus swarm">swarm.bus</span>, skipping your own <code>droneId</code>. A new cross-drone message is just a method on the node's own <code>.stl</code>.</p>
+  </div>
+</section>
+
+<section id="drone">
+  <div class="col">
+    <h2>Inside one drone</h2>
+    <p>A drone's core container runs <code>sen run config/drone.yaml</code>. Components start in ascending <code>group</code> order and stop in descending order, so the nodes start after the airframe. Discovery is still asynchronous, so a node's subscription list can be empty for a few cycles, and the code handles that.</p>
+  </div>
+  <div class="startup" aria-label="Startup order by group">
+    <div class="stage"><div class="g">group 1</div><div class="n">ether</div><div class="d">transport, from ether.yaml</div></div>
+    <div class="stage"><div class="g">group 2</div><div class="n">airframe</div><div class="d">50 Hz model, 10 Hz publish</div></div>
+    <div class="stage"><div class="g">group 4</div><div class="n">nodes</div><div class="d">start after the airframe</div></div>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Component</th><th>Objects</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>airframeComponent</code></td><td><code>flight_controller</code> <span class="bus drone">drone bus</span><br><code>drone&lt;ID&gt;</code> <span class="bus swarm">swarm.bus</span><br><code>truth_drone&lt;ID&gt;</code> <span class="bus sim">sim.bus</span></td><td>Kinematic fixed-wing model and flight modes (disarmed, armed, takeoff, hold, goingTo, land, crashed). <code>flight_controller</code> publishes <code>state</code> as one <code>VehicleState</code> struct. <code>drone&lt;ID&gt;</code> is the vehicle's public face: telemetry, plus the flight-controller commands passed on.</td></tr>
+        <tr><td><code>waypointNavigatorComponent</code></td><td><code>waypoint_navigator_drone&lt;ID&gt;</code> <span class="bus swarm">swarm.bus</span></td><td>Flies a <code>Route</code> by calling <code>flight_controller.goToPosition()</code> once per waypoint.</td></tr>
+        <tr><td><code>imagingSensorComponent</code></td><td><code>sensor</code> <span class="bus drone">drone bus</span></td><td>Simulated payload. Reads ground-asset truth from <span class="bus sim">sim.bus</span> and publishes <code>tracks</code>.</td></tr>
+        <tr><td><code>exampleNodeComponent</code></td><td><code>example_drone&lt;ID&gt;</code> <span class="bus swarm">swarm.bus</span></td><td>Copy-and-modify template for new nodes: reads <code>flight_controller</code>, publishes <code>position</code>, takes <code>setMessage</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col" style="margin-top:16px">
+    <p><code>config/drone.yaml</code> is the one drone config. Adding or removing a node is one YAML block, with no C++ change; a partner component is a compose service, not a config line.</p>
+  </div>
+</section>
+
+<section id="containers">
+  <div class="col">
+    <h2>Compiled nodes and container images</h2>
+    <p>Every piece of on-board software is a SEN object made by compiled C++. What differs is where that code is packaged and which process runs it.</p>
+  </div>
+  <div class="rules">
+    <div class="rule">
+      <h3>Our nodes: packages in the core</h3>
+      <p>Each node is a C++ package (<code>add_sen_package</code>) compiled to a shared library and baked into the <code>drone_sim/sim</code> image.</p>
+      <p><code>sen run config/drone.yaml</code> loads the packages listed under <code>imports:</code> into one process. They share one kernel, and each component gets its own thread.</p>
+      <p>Adding a node means one YAML block and a rebuild of our image.</p>
+    </div>
+    <div class="rule">
+      <h3>Partner nodes: their own image</h3>
+      <p>A partner ships a Docker image (or source that we build into one), e.g. <code>partner/geocage</code>. It is built against the partner SDK in <code>/opt/drone_sim</code>.</p>
+      <p>It runs its own <code>sen run</code> with its own YAML, so it is a separate process with its own kernel.</p>
+      <p>It uses the buses the same way our nodes do, carried by ether.</p>
+    </div>
+  </div>
+  <div class="col" style="margin-top:16px">
+    <p>SEN hides the difference. A node reading <code>flight_controller</code> gets the same interface whether the object is in its own process or another container. The only visible difference is a little more latency.</p>
+  </div>
+
+  <div class="note col">
+    <h3>One compose project per drone</h3>
+    <p>Each drone is one Docker Compose project: <code>docker/drone.compose.yml</code>, started as project <code>drone&lt;ID&gt;</code>. It holds the core container plus that drone's on-board partner containers.</p>
+    <p>Partner containers set <code>network_mode: service:core</code>, so they share the core's network and start and stop with it. SEN knows nothing about it: to SEN these are just processes that open the same <code>drone&lt;ID&gt;.bus</code>.</p>
+  </div>
+</section>
+
+<section id="contracts">
+  <div class="col">
+    <h2>The contract layer</h2>
+    <p>An <code>.stl</code> that other packages use across a bus is a contract in <code>interfaces/</code>; anything only one node uses stays in its own package.</p>
+    <ul>
+      <li><code>drone_bus/flight_controller.stl</code>: <code>state : VehicleState</code>, one struct, so every snapshot is consistent, plus <code>arm</code>, <code>takeoff</code>, <code>goToPosition</code>, <code>land</code> and more. Each returns <code>CommandAck</code>.</li>
+      <li><code>swarm_bus/waypoint_navigator.stl</code>: the navigator's contract, with a <code>droneId</code> static. Its package has no <code>STL_FILES</code> of its own.</li>
+      <li><code>swarm_bus/drone_link.stl</code>: the vehicle's public face. <code>droneId</code>, <code>envelope</code>, <code>heartbeat</code>, <code>telemetry</code> and the six flight-controller commands.</li>
+      <li>Packages extend contracts for simulator-only settings. <code>SimAirframe : extends FlightController</code> adds <code>simBus</code>, <code>publishRate</code> and the fixed-wing limits (bank, flight-path angle, loiter radius), and a typed interest on <code>FlightController</code> still finds it.</li>
+    </ul>
+    <p>Anything that changes state across a bus is a method returning <code>CommandAck</code>, never a property write. Type changes do not work across processes built from different versions (SEN converts types with silent data loss), so rebuild and restart everything together.</p>
+  </div>
+</section>
+
+<section id="command">
+  <div class="col">
+    <h2>A command, end to end</h2>
+    <p>Here is <code>setRoute</code> sent from the UI to drone 1. The UI calls the drone's own object directly; there is no router or bridge in between.</p>
+  </div>
+  <ol class="hops">
+    <li><div><div class="where">Browser → world process</div><div class="what">A REST invoke of <code>swarm.bus/waypoint_navigator_drone1.setRoute(route, 0)</code>, handled by the <code>rest</code> component.</div></div></li>
+    <li><div><div class="where">World → drone 1 core process over <span class="bus swarm">swarm.bus</span></div><div class="what">Ether delivers the call to <code>WaypointNavigatorImpl::setRouteImpl</code>.</div></div></li>
+    <li><div><div class="where">Navigator → <code>flight_controller.goToPosition()</code> on <span class="bus drone">drone1.bus</span></div><div class="what">Called once per waypoint. The navigator found <code>flight_controller</code> with an interest on its <code>droneBus</code>.</div></div></li>
+    <li><div><div class="where">The <code>CommandAck</code> goes back the same way</div><div class="what">The navigator's ack returns to the UI. The UI reads <code>status</code> and <code>currentIndex</code> from <code>waypoint_navigator_drone1</code> itself.</div></div></li>
+  </ol>
+</section>
+
+<section id="bug">
+  <div class="callout col">
+    <div class="eyebrow">Known SEN bug at the pin</div>
+    <h2>One interest per class, per shared bus, per process</h2>
+    <p>At <code>05da288e</code>, if two <em>different</em> interests in one process match the same <em>remote</em> object, that object stops updating for that process about 5 seconds later and stays frozen.</p>
+    <p>So the REST clients use a single <code>SELECT * FROM &lt;bus&gt;</code> and dispatch on class name. In each drone process, all components use the identical query per class on <span class="bus swarm">swarm.bus</span> and filter by <code>droneId</code> in code, never with <code>WHERE</code>. Drone buses are not <code>local</code> either, so the rule applies there too.</p>
+  </div>
+</section>
+
+<section id="build">
+  <div class="col">
+    <h2>Build glue</h2>
+    <p>Each package is one <code>add_sen_package</code> call. <code>DEPS drone_sim_interfaces</code> brings in the shared contract types and their generated headers.</p>
+  </div>
+<pre>add_sen_package(
+  TARGET waypoint_navigator
+  SOURCES src/waypoint_navigator_impl.h src/waypoint_navigator_impl.cpp
+  <span class="cm"># No STL_FILES: the interface is the WaypointNavigator contract in interfaces/</span>
+  DEPS drone_sim_interfaces drone_sim_common
+  SCHEMA_PATH ${CMAKE_CURRENT_BINARY_DIR}
+)</pre>
+  <div class="col">
+    <ul>
+      <li>Each <code>*_impl.cpp</code> ends with <code>SEN_EXPORT_CLASS(XImpl)</code>. Without it, startup aborts with "Type was not registered."</li>
+      <li>The YAML <code>class:</code> is <code>&lt;package&gt;.&lt;ImplName&gt;</code>, e.g. <code>waypoint_navigator.WaypointNavigatorImpl</code>.</li>
+      <li>YAML keys under an object map one-to-one to <code>[static]</code> properties, such as <code>droneBus</code>, <code>droneId</code> and <code>publishRate</code>.</li>
+      <li>An object on <span class="bus swarm">swarm.bus</span> or <span class="bus sim">sim.bus</span> opens its drone bus in its first <code>update()</code>, never in <code>registered()</code>: SEN holds the object's bus lock there, and the reverse order deadlocks the process.</li>
+    </ul>
+  </div>
+
+  <div class="next">
+    <div class="eyebrow">Next</div>
+    <h2>The waypoint navigator</h2>
+    <ul>
+      <li>How it lives on <span class="bus swarm">swarm.bus</span> but finds <code>flight_controller</code> on its drone bus</li>
+      <li>The <code>setRoute</code> → <code>goToPosition</code> loop in <code>update()</code></li>
+      <li>When a waypoint counts as reached, and when <code>arrived</code> fires</li>
+      <li>How its siblings on the drone bus find it: one <span class="bus swarm">swarm.bus</span> interest, picked by <code>droneId</code></li>
+    </ul>
+  </div>
+</section>
+</div>
+</body></html>

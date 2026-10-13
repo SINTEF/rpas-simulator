@@ -1,0 +1,10 @@
+# The transport: every SEN process of the simulator includes this file, ours (`include: [ether.yaml]`)
+# and partners' (`include: [/opt/drone_sim/config/ether.yaml]`, the copy in the partner SDK), so a
+# transport setting changes in one place. A partner image keeps the copy of the version it was built
+# against: a change here is an SDK change (version bump, partners rebuild). Discovery is SEN's default
+# multicast; SEN_ETHER_DISCOVERY_PORT (set per stack) keeps it apart from other SEN users on the LAN.
+load:
+  # group 1: the transport is a dependency of everything that publishes on a shared bus
+  # (SEN's example runs it in group 10; either works, discovery is asynchronous).
+  - name: ether
+    group: 1

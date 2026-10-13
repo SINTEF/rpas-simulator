@@ -1,0 +1,13 @@
+# On board: the geocage store, one per drone. Runs in each drone's compose project (the simulator's
+# docker/drone.compose.yml, service geocage_store): `sen run /partner/geocage/drone.yaml` with DRONE_ID set.
+include: [/opt/drone_sim/config/ether.yaml]   # the transport
+build:
+  - name: geocageStoreComponent
+    group: 2
+    freqHz: 10
+    imports: [geocage_nodes]
+    objects:
+      - name: geocage_store
+        class: geocage_nodes.GeocageStoreImpl
+        bus: drone@env(DRONE_ID).bus       # publishes on its own drone bus only
+        swarmBus: swarm.bus                # listens to its other half over the air link

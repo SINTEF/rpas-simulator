@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+package geocage;
+
+// The geocage (the global flight area): a geocage service at the base station and a geocage store on
+// board each drone. Self-contained (no import): nothing of the simulator's is needed to read it.
+
+struct Vertex
+{
+  latitude  : f64, // deg, WGS84
+  longitude : f64  // deg, WGS84
+}
+
+sequence<Vertex> Polygon;
+
+struct Geocage
+{
+  vertices    : Polygon, // at least 3, in order; closed implicitly (last -> first)
+  minAltitude : f64,     // m AMSL
+  maxAltitude : f64      // m AMSL
+}
+
+// Base station: swarm.bus/geocage. The geocage in force.
+class GeocageService
+{
+  var initialGeocage : Geocage [static];    // from the YAML
+  var geocage        : Geocage [confirmed]; // in force; starts as initialGeocage
+
+  // Replace the geocage; false (and nothing changed) if it has fewer than 3 vertices or
+  // minAltitude >= maxAltitude.
+  fn setGeocage(geocage : Geocage) -> bool;
+}
+
+// On board: drone<ID>.bus/geocage_store. The last geocage heard from swarm.bus/geocage, held while the
+// service is gone (link loss, base station restart).
+class GeocageStore
+{
+  var swarmBus  : string [static];
+  var geocage   : Geocage [confirmed]; // no vertices until the first one is heard
+  var received  : bool;                // a geocage has been heard at least once
+  var serviceUp : bool;                // swarm.bus/geocage is visible now
+}

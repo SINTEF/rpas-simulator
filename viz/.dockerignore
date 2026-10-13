@@ -1,0 +1,6 @@
+# Build context of docker/Dockerfile.web: not served by the web image.
+test/
+README.md
+fetch_area_assets.py
+__pycache__/
+.dockerignore

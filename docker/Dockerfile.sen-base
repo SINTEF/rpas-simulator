@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: MPL-2.0
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+# If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# drone_sim/sen-base: SEN runtime + codegen + CMake config, built from upstream source.
+# No `# syntax=` directive on purpose: Docker's built-in BuildKit frontend (Docker >= 23) already has
+# RUN --mount, and the directive would fetch the frontend from Docker Hub on every build (offline: fails).
+#
+#   docker build -f docker/Dockerfile.sen-base -t drone_sim/sen-base:05da288e docker   # scripts/up.sh does this
+#
+# Pinned SEN commit: 05da288e8ed4f401cabdb9419fe8c1a414892f37 (airbus/sen main, 2026-09-14).
+# Built from source because the REST fix we need (8689fd8f) is on main and in no release tag.
+# The image tag is the short commit; docker/Dockerfile's SEN_BASE names it. A SEN bump changes
+# SEN_COMMIT here, the lockfile (below) and that one SEN_BASE line.
+# Toolchain mirrors upstream tools/ci/Dockerfile (Ubuntu 22.04, gcc-12, Conan 2.28.1,
+# cmake/ninja via pip because Ubuntu's cmake 3.22 cannot read Conan's presets).
+#
+# Reproducible: the Ubuntu image by digest, SEN by commit, pip tools by version, and the ConanCenter
+# recipe revisions by docker/sen-base.conan.lock (version ranges float otherwise). apt packages stay
+# unpinned (22.04 security updates only). Regenerate the lock after a SEN bump (no compiling):
+#   docker build -f docker/Dockerfile.sen-base --target source -t drone_sim/sen-src docker
+#   docker run --rm drone_sim/sen-src sh -c 'conan config install -tf profiles .conan/profiles/sen_gcc >&2 \
+#     && conan lock create . --profile:all=sen_gcc --lockfile-out=/tmp/l >&2 && cat /tmp/l' > docker/sen-base.conan.lock
+#
+# JOBS=16 (Conan's third-party builds and SEN's own). Parallel C++ builds run a default WSL2 VM out of
+# memory and kill it: there, JOBS=1 scripts/up.sh.
+#
+# Disabled CMake options (Conan still fetches their deps; the CMake step skips the build):
+#   SEN_BUILD_EXPLORER=OFF     ImGui/SDL GUI, needs libGL at runtime, not used headless
+#   SEN_BUILD_TRACY=OFF        profiler hook, not used
+#   SEN_BUILD_JSONRPC=OFF      WebSocket/TS client, needs Node/npm at build time (npm ci); we use rest
+#   SEN_BUILD_WEBEXPLORER=OFF  React bundle baked into the binary, depends on jsonrpc + npm
+#   SEN_BUILD_PY=OFF           embedded Python, would drag libpython3.10 into the runtime image
+#   SEN_BUILD_BENCHMARKS=OFF   build time only
+# Kept: ether, rest, recorder, replayer, shell (+ influx, logmaster: cheap, no extra deps).
+
+# ubuntu:22.04 as of 2026-09-27 (image built 2026-09-01); multi-arch index digest.
+ARG UBUNTU=ubuntu:22.04@sha256:b8b6ee6aa931ecd9d0d952abc34dc0e5f7c6a30c6bb71b079fe399fde0329c02
+
+# source: toolchain + SEN checkout. Its own stage so the lockfile can be regenerated from it.
+FROM ${UBUNTU} AS source
+ARG DEBIAN_FRONTEND=noninteractive
+ARG SEN_COMMIT=05da288e8ed4f401cabdb9419fe8c1a414892f37
+
+# binutils: objdump at cmake --install time. libxext-dev/libgl1-mesa-dev/pkg-config: the SDL and
+# opengl/system Conan recipes (explorer deps are fetched by Conan even though the component is off).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        binutils ca-certificates curl g++-12 gcc-12 git make pkg-config \
+        python3 python3-dev python3-pip libxext-dev libgl1-mesa-dev \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir cmake==3.31.10 ninja==1.13.2 conan==2.28.1
+
+WORKDIR /src
+RUN git init -q . && git remote add origin https://github.com/airbus/sen.git \
+    && git fetch -q --depth 1 origin ${SEN_COMMIT} && git checkout -q FETCH_HEAD
+
+# ---------------------------------------------------------------------------
+FROM source AS builder
+ARG JOBS=16
+COPY sen-base.conan.lock /src/conan.lock
+
+# The Conan cache is a BuildKit cache mount so a retry (e.g. after a network hiccup) reuses the
+# third-party packages already built. Both RUN steps need it: the generated toolchain points into it.
+RUN --mount=type=cache,target=/root/.conan2,id=drone_sim-conan \
+    conan config install -tf profiles .conan/profiles/sen_gcc \
+    && conan install . --profile:all=sen_gcc --lockfile=conan.lock --build=missing \
+        -c tools.build:jobs=${JOBS}
+
+RUN --mount=type=cache,target=/root/.conan2,id=drone_sim-conan \
+    . build/gcc/Release/generators/conanbuild.sh \
+    && cmake --preset conan-gcc-release \
+        -DSEN_BUILD_EXPLORER=OFF -DSEN_BUILD_TRACY=OFF \
+        -DSEN_BUILD_JSONRPC=OFF -DSEN_BUILD_WEBEXPLORER=OFF \
+        -DSEN_BUILD_PY=OFF -DSEN_BUILD_BENCHMARKS=OFF \
+    && cmake --build --preset conan-gcc-release -j${JOBS} \
+    && cmake --install build/gcc/Release --prefix /opt/sen
+
+# ---------------------------------------------------------------------------
+FROM ${UBUNTU}
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cmake g++-12 make ca-certificates \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/sen /opt/sen
+ENV PATH=/opt/sen/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/sen/lib

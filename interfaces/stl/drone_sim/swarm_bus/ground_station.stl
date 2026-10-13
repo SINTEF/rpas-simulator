@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// Ground station (swarm bus, object "ground_station").
+//
+// heartbeat is the base station's liveness (the C2 link), read on board by a partner C2 component;
+// pausing the ground station stops it. The ground station forwards no commands: operators
+// call the drone's own objects on swarm.bus, drone<ID> (DroneLink) and waypoint_navigator_drone<ID>.
+class GroundStation
+{
+  var heartbeat : u64;
+}

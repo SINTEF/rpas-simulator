@@ -1,0 +1,22 @@
+# Base station: the geocage service, one per swarm. Runs next to the ground station (the simulator's
+# docker-compose.yml, service geocage): `sen run /partner/geocage/base.yaml`.
+include: [/opt/drone_sim/config/ether.yaml]   # the transport
+build:
+  - name: geocageServiceComponent
+    group: 2
+    freqHz: 10
+    imports: [geocage_nodes]
+    objects:
+      - name: geocage
+        class: geocage_nodes.GeocageServiceImpl
+        bus: swarm.bus
+        initialGeocage:
+          # The simulator's airspace (config/world.yaml, World.airspace): ~14.5 km square over
+          # Nesodden and central Oslo, 0-1500 m AMSL.
+          vertices:
+            - {latitude: 59.8150, longitude: 10.5700}
+            - {latitude: 59.8150, longitude: 10.8300}
+            - {latitude: 59.9450, longitude: 10.8300}
+            - {latitude: 59.9450, longitude: 10.5700}
+          minAltitude: 0.0
+          maxAltitude: 1500.0

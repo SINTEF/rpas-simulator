@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: MPL-2.0
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import "stl/drone_sim/common/types.stl"
+package drone_sim;
+
+// One line per drone the ground station has ever seen.
+struct DroneSummary
+{
+  droneId            : string,
+  alive              : bool,       // heartbeat advanced within lostAfter
+  mode               : FlightMode, // last known
+  battery            : f64,        // last known, 0..1
+  timeSinceHeartbeat : f64         // seconds since the heartbeat last advanced
+}
+
+sequence<DroneSummary> DroneSummaryList;
+
+// Fleet status (swarm bus, object "fleet_status"): the ground-station-side example node.
+// Watches every DroneLink on the swarm bus through one typed interest and judges liveness by
+// heartbeat: a drone whose heartbeat stops advancing -- or whose DroneLink disappears -- is lost,
+// and stays in the list as lost until it comes back.
+class FleetMonitor
+{
+  var swarmBus  : string [static];
+  var lostAfter : f64 [static];    // seconds without a heartbeat change before a drone counts as lost
+
+  var aliveCount : u32;
+  var lostCount  : u32;
+  var drones     : DroneSummaryList [confirmed];
+}
