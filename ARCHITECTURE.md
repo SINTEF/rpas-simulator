@@ -23,7 +23,6 @@ fidelity (the flight model is kinematic), swarm behaviour itself, radio-link deg
 autopilot backend, a second airframe, replay, multi-host deployment, sim-side terrain.
 
 ```
-```
  ┌──────────────────────────────────────────────────────────────────────────┐
  │ swarm bus   (SEN session "swarm", crosses containers via ether)          │
  └──┬───────────────┬────────────────┬──────────────────┬───────────────────┘
