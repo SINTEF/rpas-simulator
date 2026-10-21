@@ -23,17 +23,16 @@ fidelity (the flight model is kinematic), swarm behaviour itself, radio-link deg
 autopilot backend, a second airframe, replay, multi-host deployment, sim-side terrain.
 
 ```
-```
  ┌──────────────────────────────────────────────────────────────────────────┐
  │ swarm bus   (SEN session "swarm", crosses containers via ether)          │
  └──┬───────────────┬────────────────┬──────────────────┬───────────────────┘
     │               │                │                  │
- ┌──┴─────────┐  ┌──┴─────────┐   ┌──┴─────────┐    ┌───┴───────────────────┐
- │ drone1     │  │ drone2     │   │ ground_    │    │ world                 │
- │ ┌────────┐ │  │            │   │  station   │    │ terrain, ground assets│
- │ │ nodes… │ │  │  (same     │   │ + ground-  │    │ clock, environment    │
- │ ├────────┤ │  │   image,   │   │ station    │    │ rest ⇐ browser (3D UI)│
- │ │ flight │ │  │   same     │   │ nodes      │    └───────────┬───────────┘
+ ┌──┴─────────┐  ┌──┴─────────┐   ┌──┴─────────┐    ┌───┴────────────────────┐
+ │ drone1     │  │ drone2     │   │ ground_    │    │ world                  │
+ │ ┌────────┐ │  │            │   │  station   │    │ terrain, ground assets │
+ │ │ nodes… │ │  │  (same     │   │ + ground-  │    │ clock, environment     │
+ │ ├────────┤ │  │   image,   │   │ station    │    │ rest ◄= browser (3D UI)│
+ │ │ flight │ │  │   same     │   │ nodes      │    └───────────┬────────────┘
  │ │ control│ │  │   config)  │   └────────────┘                │
  │ │ + model│◄┼──┼────────────┼─────────────────────────────────┘
  │ └────────┘ │  │            │   sim bus (session "sim")
